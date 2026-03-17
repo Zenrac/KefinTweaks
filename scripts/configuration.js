@@ -14,6 +14,7 @@
         { key: 'spotlightGenre', label: 'Spotlight Sections (Genre)', defaultName: 'Spotlight' },
         { key: 'spotlightNetwork', label: 'Spotlight Sections (Network)', defaultName: 'Spotlight' },
         { key: 'genreMovies', label: 'Genre Movies', defaultName: '[Genre] Movies' },
+        { key: 'genreShows', label: 'Genre Shows', defaultName: '[Genre] Shows' },
         { key: 'studioShows', label: 'Shows from [Studio]', defaultName: 'Shows from [Studio]' },
         { key: 'collections', label: 'Collection Spotlight', defaultName: '[Collection Name]', extras: { minimumItems: 10 } },
         { key: 'becauseYouWatched', label: 'Because you watched [Movie]', defaultName: 'Because you watched [Movie]' },
@@ -2006,6 +2007,12 @@
                 <div class="listItemContent">
                                     <div class="listItemBodyText" style="margin-bottom: 0.5em;">Minimum Movie count for Genres</div>
                                     <input type="number" id="homeScreen_discovery_minGenreMovieCount" class="fld emby-input" value="${discovery.minGenreMovieCount || 50}" min="1" style="width: 100%; max-width: 200px;">
+                </div>
+            </div>
+            <div class="listItem" style="border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 0.75em;">
+                <div class="listItemContent">
+                                    <div class="listItemBodyText" style="margin-bottom: 0.5em;">Minimum Show count for Genres</div>
+                                    <input type="number" id="homeScreen_discovery_minGenreShowCount" class="fld emby-input" value="${discovery.minGenreShowCount || 25}" min="1" style="width: 100%; max-width: 200px;">
                 </div>
             </div>
             <div class="listItem" style="border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 0.75em;">
@@ -5230,6 +5237,7 @@
                 randomizeOrder: document.getElementById('homeScreen_discovery_randomizeOrder')?.checked === true,
                 minPeopleAppearances: parseInt(document.getElementById('homeScreen_discovery_minPeopleAppearances')?.value || '10'),
                 minGenreMovieCount: parseInt(document.getElementById('homeScreen_discovery_minGenreMovieCount')?.value || '50'),
+                minGenreShowCount: parseInt(document.getElementById('homeScreen_discovery_minGenreShowCount')?.value || '25'),
                 spotlightDiscoveryChance: parseFloat(document.getElementById('homeScreen_discovery_spotlightDiscoveryChance')?.value || '0.5'),
                 renderSpotlightAboveMatching: document.getElementById('homeScreen_discovery_renderSpotlightAboveMatching')?.checked === true,
                 defaultItemLimit: parseInt(document.getElementById('homeScreen_discovery_itemLimit')?.value || '16'),

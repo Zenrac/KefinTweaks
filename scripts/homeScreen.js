@@ -495,6 +495,7 @@
                     infiniteScroll: old.enableInfiniteScroll !== false,
                     minPeopleAppearances: old.minPeopleAppearances || 10,
                     minGenreMovieCount: old.minGenreMovieCount || 50,
+                    minGenreShowCount: old.minGenreShowCount || 25,
                     defaultItemLimit: 16,
                     defaultSortOrder: "Random",
                     defaultCardFormat: "Poster",
@@ -502,6 +503,7 @@
                         spotlightGenre: true,
                         spotlightNetwork: true,
                         genreMovies: true,
+                        genreShows: true,
                         studioShows: true,
                         collections: {
                             enabled: true,
@@ -859,12 +861,14 @@
     const enableInfiniteScroll = discoveryConfig.infiniteScroll !== false;
     const minPeopleAppearances = discoveryConfig.minPeopleAppearances || 10;
     const minGenreMovieCount = discoveryConfig.minGenreMovieCount || 50;
+    const minGenreShowCount = discoveryConfig.minGenreShowCount || 25;
     const DISCOVERY_ORDER = 1000; // Discovery sections use dynamic ordering
 
     const DISCOVERY_SECTION_DEFINITIONS = [
         { key: 'spotlightGenre', defaultName: 'Spotlight' },
         { key: 'spotlightNetwork', defaultName: 'Spotlight' },
         { key: 'genreMovies', defaultName: '[Genre] Movies' },
+        { key: 'genreShows', defaultName: '[Genre] Shows' },
         { key: 'studioShows', defaultName: 'Shows from [Studio]' },
         { key: 'collections', defaultName: '[Collection Name]', minimumItems: 10 },
         { key: 'becauseYouWatched', defaultName: 'Because you watched [Movie]' },
@@ -885,6 +889,7 @@
 
     const discoverySectionTypeMap = {
         'genre': 'genreMovies',
+        'genre-show': 'genreShows',
         'director': 'directedByTopDirector',
         'writer': 'writtenByTopWriter',
         'actor': 'starringTopActor',
@@ -1676,6 +1681,47 @@
             return optimizedGenres;
         } catch (err) {
             ERR('Failed to fetch movie genres:', err);
+            return [];
+        }
+    }
+
+    /**
+     * Fetches all TV show genres from Jellyfin API and caches them
+     * @returns {Promise<Array>} - Array of genre objects with Name, ImageTags, and SeriesCount
+     */
+    async function fetchAndCacheShowGenres() {
+        const apiClient = window.ApiClient;
+        const serverUrl = apiClient.serverAddress();
+        const token = apiClient.accessToken();
+
+        try {
+            const response = await fetch(`${serverUrl}/Genres?IncludeItemTypes=Series`, {
+                headers: {
+                    "Authorization": `MediaBrowser Token="${token}"`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const genres = data.Items || [];
+
+            const optimizedGenres = genres.map(genre => ({
+                Id: genre.Id,
+                Name: genre.Name,
+                ImageTags: genre.ImageTags || {},
+                SeriesCount: genre.SeriesCount
+            }));
+
+            const cache = new window.LocalStorageCache();
+            cache.set('showGenres', optimizedGenres);
+            LOG(`Cached ${optimizedGenres.length} show genres`);
+
+            return optimizedGenres;
+        } catch (err) {
+            ERR('Failed to fetch show genres:', err);
             return [];
         }
     }
@@ -3618,6 +3664,31 @@
                     }
                     return null;
                 })(),
+
+                // 1b. [Genre] Shows
+                (async () => {
+                    const sectionConfig = getDiscoverySectionSettings('genreShows');
+                    if (!sectionConfig || !sectionConfig.enabled) return null;
+
+                    const randomGenre = await getRandomShowGenre();
+                    if (!randomGenre) return null;
+
+                    const genreData = await preloadGenreShowsSection(
+                        randomGenre,
+                        sectionConfig.itemLimit ?? (discoveryConfig.defaultItemLimit ?? defaultItemLimit)
+                    );
+
+                    if (!genreData) return null;
+
+                    return {
+                        type: 'genre-show',
+                        sectionKey: 'genreShows',
+                        config: sectionConfig,
+                        data: randomGenre,
+                        items: genreData.items,
+                        viewMoreUrl: genreData.viewMoreUrl
+                    };
+                })(),
                 
                 // 2. Directed by [Director] (use cached items directly)
                 (async () => {
@@ -4736,6 +4807,49 @@
     }
 
     /**
+     * Preloads genre show section data
+     * @param {Object} genre - Genre object
+     * @returns {Promise<Object|null>} - Genre data with items and viewMoreUrl
+     */
+    async function preloadGenreShowsSection(genre, limit = 16) {
+        try {
+            const apiClient = window.ApiClient;
+            const serverUrl = apiClient.serverAddress();
+            const token = apiClient.accessToken();
+            const userId = apiClient.getCurrentUserId();
+            const serverId = apiClient.serverId();
+
+            const url = `${serverUrl}/Items?userId=${userId}&Genres=${encodeURIComponent(genre.Name)}&IncludeItemTypes=Series&Recursive=true&SortBy=Random&Fields=UserData&Limit=${limit}`;
+
+            const response = await fetch(url, {
+                headers: {
+                    "Authorization": `MediaBrowser Token="${token}"`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const items = data.Items || [];
+
+            if (items.length === 0) return null;
+
+            const viewMoreUrl = `/web/#/list.html?genreId=${genre.Id}&serverId=${serverId}`;
+
+            return {
+                items: items,
+                viewMoreUrl: viewMoreUrl,
+                hasFullItems: true
+            };
+        } catch (err) {
+            ERR(`Error preloading genre shows section for ${genre.Name}:`, err);
+            return null;
+        }
+    }
+
+    /**
      * Preloads "because you watched" section data
      * @param {Object} movie - Movie object
      * @returns {Promise<Object|null>} - Similar content data
@@ -4832,6 +4946,11 @@
                         const genreTemplate = sectionConfig?.name || '[Genre] Movies';
                         sectionName = formatSectionName(genreTemplate, { Genre: sectionData.data.Name });
                         sectionId = `genre-${sectionData.data.Name.toLowerCase()}`;
+                        break;
+                    case 'genre-show':
+                        const genreShowsTemplate = sectionConfig?.name || '[Genre] Shows';
+                        sectionName = formatSectionName(genreShowsTemplate, { Genre: sectionData.data.Name });
+                        sectionId = `genre-show-${sectionData.data.Name.toLowerCase()}`;
                         break;
                     case 'director':
                         const directorTemplate = sectionConfig?.name || 'Directed by [Director]';
@@ -5448,6 +5567,31 @@
             renderedSections.add(`genre-${randomGenre.Name.toLowerCase()}`);
         }
         
+        return randomGenre;
+    }
+
+    async function getRandomShowGenre() {
+        const cache = new window.LocalStorageCache();
+        let showGenres = cache.get('showGenres');
+
+        if (!showGenres || showGenres.length === 0) {
+            showGenres = await fetchAndCacheShowGenres();
+        }
+
+        if (showGenres.length === 0) return null;
+
+        const availableGenres = showGenres.filter(genre =>
+            !renderedSections.has(`genre-show-${genre.Name.toLowerCase()}`) &&
+            (genre.SeriesCount || 0) >= minGenreShowCount
+        );
+
+        if (availableGenres.length === 0) return null;
+
+        const randomGenre = getRandomItem(availableGenres);
+        if (randomGenre) {
+            renderedSections.add(`genre-show-${randomGenre.Name.toLowerCase()}`);
+        }
+
         return randomGenre;
     }
 

@@ -256,6 +256,7 @@ window.KefinTweaksDefaultConfig = {
       "infiniteScroll": true,
       "minPeopleAppearances": 10,
       "minGenreMovieCount": 50,
+      "minGenreShowCount": 25,
       "defaultItemLimit": 16,
       "defaultSortOrder": "Random",
       "defaultCardFormat": "Poster",
@@ -279,6 +280,14 @@ window.KefinTweaksDefaultConfig = {
         "genreMovies": {
           "enabled": true,
           "name": "[Genre] Movies",
+          "itemLimit": 16,
+          "sortOrder": "Random",
+          "sortOrderDirection": "Ascending",
+          "cardFormat": "Poster"
+        },
+        "genreShows": {
+          "enabled": true,
+          "name": "[Genre] Shows",
           "itemLimit": 16,
           "sortOrder": "Random",
           "sortOrderDirection": "Ascending",
