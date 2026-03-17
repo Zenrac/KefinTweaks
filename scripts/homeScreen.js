@@ -501,6 +501,7 @@
                     defaultCardFormat: "Poster",
                     sectionTypes: {
                         spotlightGenre: true,
+                        spotlightGenreShows: true,
                         spotlightNetwork: true,
                         genreMovies: true,
                         genreShows: true,
@@ -866,6 +867,7 @@
 
     const DISCOVERY_SECTION_DEFINITIONS = [
         { key: 'spotlightGenre', defaultName: 'Spotlight' },
+        { key: 'spotlightGenreShows', defaultName: 'Spotlight' },
         { key: 'spotlightNetwork', defaultName: 'Spotlight' },
         { key: 'genreMovies', defaultName: '[Genre] Movies' },
         { key: 'genreShows', defaultName: '[Genre] Shows' },
@@ -901,6 +903,7 @@
         'director-recent': 'directedByDirectorRecentlyWatched',
         'writer-recent': 'writtenByWriterRecentlyWatched',
         'spotlight-genre': 'spotlightGenre',
+        'spotlight-genre-show': 'spotlightGenreShows',
         'spotlight-network': 'spotlightNetwork',
         'collection': 'collections'
     };
@@ -1076,11 +1079,14 @@
     let renderedStudios = new Set(); // Track rendered studio IDs
     let renderedWatchedMovies = new Set(); // Track rendered watched movie IDs for "Because you watched" sections
     let renderedGenres = new Set(); // Track rendered genre IDs for spotlight sections
+    let renderedShowGenres = new Set(); // Track rendered show genre IDs for spotlight sections
     let renderedNetworks = new Set(); // Track rendered network IDs for spotlight sections
     let renderedCollections = new Set(); // Track rendered collection IDs
     let renderedCustomDiscoverySections = new Set(); // Track custom sections used in discovery
     let cachedQualifyingGenres = null; // Cache qualifying genres to avoid refetching
     let isCachingQualifyingGenres = false; // Prevent parallel caching
+    let cachedQualifyingShowGenres = null; // Cache qualifying show genres to avoid refetching
+    let isCachingQualifyingShowGenres = false; // Prevent parallel caching
     let renderedFavoriteMovies = new Set(); // Track rendered favorite movie IDs
     let renderedStarringWatchedMovies = new Set(); // Track movies used for "Starring X since you watched Y" sections
     let renderedDirectedWatchedMovies = new Set(); // Track movies used for "Directed by X since you watched Y" sections
@@ -3577,18 +3583,21 @@
             const renderSpotlightAboveMatching = discoveryConfig.renderSpotlightAboveMatching === true;
 
             let renderGenresSpotlight = false;
+            let renderShowGenresSpotlight = false;
             let renderNetworksSpotlight = false;
             let renderCollectionsSpotlight = false;
 
             // Pre-selected data for forced matching
             let forcedGenre = null;
+            let forcedShowGenre = null;
             let forcedNetwork = null;
 
             if (Math.random() < spotlightChance) {
                 // Randomly pick one of the spotlight sections to render
-                const spotlightSections = ['spotlight-genre', 'spotlight-network', 'spotlight-collection'];
+                const spotlightSections = ['spotlight-genre', 'spotlight-genre-show', 'spotlight-network', 'spotlight-collection'];
                 const selectedSpotlightSection = spotlightSections[Math.floor(Math.random() * spotlightSections.length)];
                 renderGenresSpotlight = selectedSpotlightSection === 'spotlight-genre';
+                renderShowGenresSpotlight = selectedSpotlightSection === 'spotlight-genre-show';
                 renderNetworksSpotlight = selectedSpotlightSection === 'spotlight-network';
                 renderCollectionsSpotlight = selectedSpotlightSection === 'spotlight-collection';
 
@@ -3601,6 +3610,14 @@
                         } catch (e) {
                             ERR('Error pre-selecting genre for forced matching:', e);
                             renderGenresSpotlight = false;
+                        }
+                    } else if (renderShowGenresSpotlight) {
+                        try {
+                            forcedShowGenre = await getRandomShowGenre();
+                            if (!forcedShowGenre) renderShowGenresSpotlight = false;
+                        } catch (e) {
+                            ERR('Error pre-selecting show genre for forced matching:', e);
+                            renderShowGenresSpotlight = false;
                         }
                     } else if (renderNetworksSpotlight) {
                         try {
@@ -3670,7 +3687,12 @@
                     const sectionConfig = getDiscoverySectionSettings('genreShows');
                     if (!sectionConfig || !sectionConfig.enabled) return null;
 
-                    const randomGenre = await getRandomShowGenre();
+                    let randomGenre = null;
+                    if (forcedShowGenre) {
+                        randomGenre = forcedShowGenre;
+                    } else {
+                        randomGenre = await getRandomShowGenre();
+                    }
                     if (!randomGenre) return null;
 
                     const genreData = await preloadGenreShowsSection(
@@ -4140,7 +4162,61 @@
                     }
                 })(),
                 
-                // 13. Spotlight: Top Rated from [TV Network]
+                // 13. Spotlight: Top Rated Shows from [Genre]
+                (async () => {
+                    if (!renderShowGenresSpotlight) return null;
+                    const sectionConfig = getDiscoverySectionSettings('spotlightGenreShows');
+                    if (!sectionConfig || !sectionConfig.enabled) return null;
+
+                    try {
+                        let selectedGenre = null;
+
+                        if (forcedShowGenre) {
+                            selectedGenre = forcedShowGenre;
+                            renderedShowGenres.add(selectedGenre.Id);
+                        } else {
+                            const allQualifyingShowGenres = await getQualifyingShowGenres();
+                            if (allQualifyingShowGenres.length === 0) return null;
+
+                            const availableShowGenres = allQualifyingShowGenres.filter(genre =>
+                                !renderedShowGenres.has(genre.Id)
+                            );
+
+                            if (availableShowGenres.length === 0) return null;
+
+                            selectedGenre = availableShowGenres[Math.floor(Math.random() * availableShowGenres.length)];
+                            renderedShowGenres.add(selectedGenre.Id);
+                        }
+
+                        const itemLimit = sectionConfig.itemLimit ?? (discoveryConfig.defaultItemLimit ?? defaultItemLimit);
+                        const showsResponse = await ApiClient.getItems(ApiClient.getCurrentUserId(), {
+                            Genres: selectedGenre.Name,
+                            IncludeItemTypes: 'Series',
+                            Recursive: true,
+                            SortBy: 'CommunityRating',
+                            SortOrder: 'Descending',
+                            Limit: itemLimit,
+                            Fields: 'BackdropImageTags,ImageTags,Overview,Taglines,ProductionYear,RecursiveItemCount,ChildCount'
+                        });
+
+                        const shows = showsResponse.Items || [];
+                        if (shows.length === 0) return null;
+
+                        return {
+                            type: 'spotlight-genre-show',
+                            sectionKey: 'spotlightGenreShows',
+                            config: sectionConfig,
+                            data: selectedGenre,
+                            items: shows,
+                            viewMoreUrl: `${ApiClient.serverAddress()}/web/#/list.html?genreId=${selectedGenre.Id}&serverId=${ApiClient.serverId()}`
+                        };
+                    } catch (err) {
+                        ERR('Error generating spotlight genre shows section:', err);
+                        return null;
+                    }
+                })(),
+
+                // 14. Spotlight: Top Rated from [TV Network]
                 (async () => {
                     if (!renderNetworksSpotlight) return null;
                     const sectionConfig = getDiscoverySectionSettings('spotlightNetwork');
@@ -4332,6 +4408,17 @@
                         
                         // Insert spotlight immediately before the content section
                         sections.splice(newGenreSectionIndex, 0, spotlight);
+                    }
+                }
+
+                if (forcedShowGenre) {
+                    const genreShowSectionIndex = sections.findIndex(s => s.type === 'genre-show' && s.data.Id === forcedShowGenre.Id);
+                    const genreShowSpotlightIndex = sections.findIndex(s => s.type === 'spotlight-genre-show' && s.data.Id === forcedShowGenre.Id);
+
+                    if (genreShowSectionIndex !== -1 && genreShowSpotlightIndex !== -1) {
+                        const [spotlight] = sections.splice(genreShowSpotlightIndex, 1);
+                        const newGenreShowSectionIndex = sections.findIndex(s => s.type === 'genre-show' && s.data.Id === forcedShowGenre.Id);
+                        sections.splice(newGenreShowSectionIndex, 0, spotlight);
                     }
                 }
 
@@ -5043,6 +5130,32 @@
                         container.appendChild(spotlightGenreContainer);
                         renderedSections.add(sectionId);
                         return true;
+                    case 'spotlight-genre-show':
+                        // Handle spotlight genre shows section - render as spotlight
+                        if (!window.cardBuilder || !window.cardBuilder.renderSpotlightSection) {
+                            WARN("cardBuilder.renderSpotlightSection not available");
+                            return false;
+                        }
+                        const spotlightGenreShowsTemplate = sectionConfig?.name || 'Spotlight';
+                        sectionName = formatSectionName(spotlightGenreShowsTemplate, { Genre: sectionData.data.Name });
+                        sectionId = `spotlight-genre-show-${sectionData.data.Id}`;
+                        const spotlightGenreShowsContainer = window.cardBuilder.renderSpotlightSection(
+                            items,
+                            sectionName,
+                            {
+                                autoPlay: true,
+                                interval: 5000,
+                                showDots: true,
+                                showNavButtons: true,
+                                showClearArt: true
+                            },
+                        );
+                        spotlightGenreShowsContainer.setAttribute('data-custom-section-id', sectionId);
+                        spotlightGenreShowsContainer.setAttribute('data-custom-section-name', sectionName);
+                        spotlightGenreShowsContainer.style.order = order;
+                        container.appendChild(spotlightGenreShowsContainer);
+                        renderedSections.add(sectionId);
+                        return true;
                     case 'spotlight-network':
                         // Handle spotlight network section - render as spotlight
                         if (!window.cardBuilder || !window.cardBuilder.renderSpotlightSection) {
@@ -5541,6 +5654,57 @@
             return [];
         } finally {
             isCachingQualifyingGenres = false;
+        }
+    }
+
+    async function getQualifyingShowGenres() {
+        if (cachedQualifyingShowGenres !== null) {
+            return cachedQualifyingShowGenres;
+        }
+
+        if (isCachingQualifyingShowGenres) {
+            while (isCachingQualifyingShowGenres) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            return cachedQualifyingShowGenres || [];
+        }
+
+        isCachingQualifyingShowGenres = true;
+
+        try {
+            LOG('Fetching and caching qualifying show genres...');
+
+            const serverAddress = ApiClient.serverAddress();
+            const token = ApiClient.accessToken();
+            const genresResponse = await fetch(`${serverAddress}/Genres?IncludeItemTypes=Series`, {
+                headers: { "Authorization": `MediaBrowser Token="${token}"` }
+            });
+
+            if (!genresResponse.ok) {
+                ERR(`Failed to fetch show genres: ${genresResponse.statusText}`);
+                isCachingQualifyingShowGenres = false;
+                return [];
+            }
+
+            const genresData = await genresResponse.json();
+            const genres = genresData.Items || [];
+            const qualifyingShowGenres = [];
+
+            for (const genre of genres) {
+                if ((genre.SeriesCount || 0) < minGenreShowCount) continue;
+                qualifyingShowGenres.push(genre);
+            }
+
+            cachedQualifyingShowGenres = qualifyingShowGenres;
+            LOG(`Cached ${qualifyingShowGenres.length} qualifying show genres`);
+
+            return qualifyingShowGenres;
+        } catch (err) {
+            ERR('Error fetching qualifying show genres:', err);
+            isCachingQualifyingShowGenres = false;
+            return [];
+        } finally {
+            isCachingQualifyingShowGenres = false;
         }
     }
 

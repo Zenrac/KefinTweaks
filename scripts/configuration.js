@@ -12,6 +12,7 @@
 
     const DISCOVERY_SECTION_DEFINITIONS = [
         { key: 'spotlightGenre', label: 'Spotlight Sections (Genre)', defaultName: 'Spotlight' },
+        { key: 'spotlightGenreShows', label: 'Spotlight Sections (Genre Shows)', defaultName: 'Spotlight' },
         { key: 'spotlightNetwork', label: 'Spotlight Sections (Network)', defaultName: 'Spotlight' },
         { key: 'genreMovies', label: 'Genre Movies', defaultName: '[Genre] Movies' },
         { key: 'genreShows', label: 'Genre Shows', defaultName: '[Genre] Shows' },

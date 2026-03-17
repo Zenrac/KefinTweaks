@@ -269,6 +269,14 @@ window.KefinTweaksDefaultConfig = {
           "sortOrderDirection": "Ascending",
           "cardFormat": "Poster"
         },
+        "spotlightGenreShows": {
+          "enabled": true,
+          "name": "Top Rated [Genre] Shows",
+          "itemLimit": 16,
+          "sortOrder": "Random",
+          "sortOrderDirection": "Ascending",
+          "cardFormat": "Poster"
+        },
         "spotlightNetwork": {
           "enabled": true,
           "name": "Top Rated Shows from [Studio]",
