@@ -2018,6 +2018,13 @@
             </div>
             <div class="listItem" style="border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 0.75em;">
                 <div class="listItemContent">
+                                    <div class="listItemBodyText" style="margin-bottom: 0.5em;">Excluded Genres</div>
+                                    <input type="text" id="homeScreen_discovery_excludedGenres" class="fld emby-input" value="${Array.isArray(discovery.excludedGenres) ? discovery.excludedGenres.join(', ') : ''}" placeholder="Animation, Anime" style="width: 100%; max-width: 300px;">
+                                    <div class="listItemBodyText secondary" style="font-size: 0.85em; margin-top: 0.25em;">Comma-separated. Applies to Genre Movies, Genre Shows, and both genre spotlights.</div>
+                </div>
+            </div>
+            <div class="listItem" style="border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 0.75em;">
+                <div class="listItemContent">
                                     <div class="listItemBodyText" style="margin-bottom: 0.5em;">Spotlight & Collection Spawn Chance</div>
                                     <input type="number" id="homeScreen_discovery_spotlightDiscoveryChance" class="fld emby-input" value="${discovery.spotlightDiscoveryChance ?? 0.5}" min="0" max="1" step="0.01" style="width: 100%; max-width: 200px;">
                                     <div class="listItemBodyText secondary" style="font-size: 0.85em; margin-top: 0.25em;">0.0 = never, 1.0 = always</div>
@@ -5239,6 +5246,10 @@
                 minPeopleAppearances: parseInt(document.getElementById('homeScreen_discovery_minPeopleAppearances')?.value || '10'),
                 minGenreMovieCount: parseInt(document.getElementById('homeScreen_discovery_minGenreMovieCount')?.value || '50'),
                 minGenreShowCount: parseInt(document.getElementById('homeScreen_discovery_minGenreShowCount')?.value || '25'),
+                excludedGenres: (() => {
+                    const raw = document.getElementById('homeScreen_discovery_excludedGenres')?.value || '';
+                    return raw.split(',').map(g => g.trim()).filter(Boolean);
+                })(),
                 spotlightDiscoveryChance: parseFloat(document.getElementById('homeScreen_discovery_spotlightDiscoveryChance')?.value || '0.5'),
                 renderSpotlightAboveMatching: document.getElementById('homeScreen_discovery_renderSpotlightAboveMatching')?.checked === true,
                 defaultItemLimit: parseInt(document.getElementById('homeScreen_discovery_itemLimit')?.value || '16'),

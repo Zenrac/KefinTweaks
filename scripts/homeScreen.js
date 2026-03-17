@@ -496,6 +496,7 @@
                     minPeopleAppearances: old.minPeopleAppearances || 10,
                     minGenreMovieCount: old.minGenreMovieCount || 50,
                     minGenreShowCount: old.minGenreShowCount || 25,
+                    excludedGenres: Array.isArray(old.excludedGenres) ? old.excludedGenres : [],
                     defaultItemLimit: 16,
                     defaultSortOrder: "Random",
                     defaultCardFormat: "Poster",
@@ -863,6 +864,12 @@
     const minPeopleAppearances = discoveryConfig.minPeopleAppearances || 10;
     const minGenreMovieCount = discoveryConfig.minGenreMovieCount || 50;
     const minGenreShowCount = discoveryConfig.minGenreShowCount || 25;
+    const excludedGenres = Array.isArray(discoveryConfig.excludedGenres)
+        ? discoveryConfig.excludedGenres
+        : (typeof discoveryConfig.excludedGenres === 'string'
+            ? discoveryConfig.excludedGenres.split(',').map(g => g.trim()).filter(Boolean)
+            : []);
+    const excludedGenresSet = new Set(excludedGenres.map(g => g.toLowerCase()));
     const DISCOVERY_ORDER = 1000; // Discovery sections use dynamic ordering
 
     const DISCOVERY_SECTION_DEFINITIONS = [
@@ -919,6 +926,10 @@
         if (config && config.isPlayed === true) return 'IsPlayed';
         if (config && config.isPlayed === false) return 'IsUnplayed';
         return null;
+    }
+
+    function isGenreExcluded(genreName) {
+        return !!genreName && excludedGenresSet.has(genreName.toLowerCase());
     }
 
     let collectionsData = null;
@@ -5639,6 +5650,7 @@
             // Check each genre to see if it has enough movies
             for (const genre of genres) {
                 if (genre.MovieCount < minGenreMovieCount) continue;
+                if (isGenreExcluded(genre.Name)) continue;
                 qualifyingGenres.push(genre);
             }
             
@@ -5692,6 +5704,7 @@
 
             for (const genre of genres) {
                 if ((genre.SeriesCount || 0) < minGenreShowCount) continue;
+                if (isGenreExcluded(genre.Name)) continue;
                 qualifyingShowGenres.push(genre);
             }
 
@@ -5721,6 +5734,7 @@
         // Filter out already rendered genres and genres with insufficient movie count
         const availableGenres = movieGenres.filter(genre => 
             !renderedSections.has(`genre-${genre.Name.toLowerCase()}`) &&
+            !isGenreExcluded(genre.Name) &&
             (genre.MovieCount || 0) >= minGenreMovieCount
         );
         
@@ -5746,6 +5760,7 @@
 
         const availableGenres = showGenres.filter(genre =>
             !renderedSections.has(`genre-show-${genre.Name.toLowerCase()}`) &&
+            !isGenreExcluded(genre.Name) &&
             (genre.SeriesCount || 0) >= minGenreShowCount
         );
 

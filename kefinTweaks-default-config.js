@@ -257,6 +257,7 @@ window.KefinTweaksDefaultConfig = {
       "minPeopleAppearances": 10,
       "minGenreMovieCount": 50,
       "minGenreShowCount": 25,
+      "excludedGenres": [],
       "defaultItemLimit": 16,
       "defaultSortOrder": "Random",
       "defaultCardFormat": "Poster",
