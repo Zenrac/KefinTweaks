@@ -3797,7 +3797,7 @@
                 const token = window.ApiClient.accessToken();
                 
                 const response = await fetch(`${serverAddress}/Users/${userId}/Items?IncludeItemTypes=BoxSet,CollectionFolder&Recursive=true&Fields=ItemCounts`, {
-                    headers: { 'X-Emby-Token': token }
+                    headers: { 'Authorization': apiHelper.getAuthHeader() }
                 });
                 
                 if (!response.ok) {
@@ -3917,7 +3917,7 @@
                 const token = window.ApiClient.accessToken();
                 
                 const response = await fetch(`${serverAddress}/Users/${userId}/Items?IncludeItemTypes=Playlist&Recursive=true&Fields=ItemCounts`, {
-                    headers: { 'X-Emby-Token': token }
+                    headers: { 'Authorization': apiHelper.getAuthHeader() }
                 });
                 
                 if (!response.ok) {
@@ -4037,7 +4037,7 @@
                 const token = window.ApiClient.accessToken();
                 
                 const response = await fetch(`${serverAddress}/Users/${userId}/Items?IncludeItemTypes=BoxSet,CollectionFolder&Recursive=true&Fields=ItemCounts`, {
-                    headers: { 'X-Emby-Token': token }
+                    headers: { 'Authorization': apiHelper.getAuthHeader() }
                 });
                 
                 if (!response.ok) {
@@ -4175,7 +4175,7 @@
                 const token = window.ApiClient.accessToken();
                 
                 const response = await fetch(`${serverAddress}/Users/${userId}/Items?IncludeItemTypes=Playlist&Recursive=true&Fields=ItemCounts`, {
-                    headers: { 'X-Emby-Token': token }
+                    headers: { 'Authorization': apiHelper.getAuthHeader() }
                 });
                 
                 if (!response.ok) {
@@ -4753,23 +4753,10 @@
             }
 
             const server = ApiClient._serverAddress;
-            const token = ApiClient.accessToken();
-            const client = typeof ApiClient.applicationName === 'function' ? ApiClient.applicationName() : 'Jellyfin Web';
-            const device = typeof ApiClient.deviceName === 'function' ? ApiClient.deviceName() : (navigator.userAgent.includes('Chrome') ? 'Chrome' : 'Browser');
-            const deviceId = typeof ApiClient.deviceId === 'function' ? ApiClient.deviceId() : '';
-            const version = ApiClient._appVersion || ApiClient._serverVersion || '';
-            const parts = [
-                `Client="${encodeURIComponent(client)}"`,
-                `Device="${encodeURIComponent(device)}"`,
-                `DeviceId="${encodeURIComponent(deviceId)}"`,
-                `Version="${encodeURIComponent(version)}"`,
-                `Token="${encodeURIComponent(token)}"`
-            ];
-            const auth = `MediaBrowser ${parts.join(', ')}`;
 
             const response = await fetch(`${server}/Plugins/${pluginId}/Configuration`, {
                 headers: {
-                    'Authorization': auth
+                    'Authorization': apiHelper.getAuthHeader()
                 }
             });
 
